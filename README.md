@@ -10,3 +10,8 @@ This project aims to be used to raise ether through an ICO - the goal amount is 
 - max supply of 500,000 tokens
 - 2% tax on every transfer that gets put into a treasury account
 - Owner can toggle this tax on/off
+
+# How to run the project
+- run "npm install" to install all dependencies
+- the logic for implementing the ico is found in contracts/ico.sol
+- test cases are found in test/ico_test.js and can be ran with the command "npx hardhat test"
