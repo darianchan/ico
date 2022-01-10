@@ -163,5 +163,9 @@ contract ICO {
         emit Mint(msg.sender, _tokenAmount);
     }
 
-
+    // make it require that the goal is raised to withdraw?
+    function withdraw() public onlyOwner {
+        (bool success, ) = creator.call{value: totalRaised}("");
+        require(success);
+    }
 }
