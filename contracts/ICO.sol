@@ -8,13 +8,14 @@ import "hardhat/console.sol";
 
 contract ICO {
     address public creator;
-    bool public taxOn;
-    uint public goal = 30000 * 1 ether;
+    bool public taxOn; // defaults to being turned on
+    uint constant public goal = 30000 * 1 ether;
     uint public seedRaised;
     uint public generalRaised;
     uint public openRaised;
     uint public totalRaised;
     bool public isPaused;
+    Phases public phase;
     mapping (address => uint) public seedContributions;
     mapping (address => uint) public generalContributions;
     mapping (address => bool) public whitelisted;
@@ -29,10 +30,7 @@ contract ICO {
         OPEN
     }
 
-    Phases public phase = Phases.NOTSTARTED;
-
-    // our max supply should be 500,000 total
-    // have all 500,000 supply minted to this ICO contract
+    // have all 500,000 total supply minted to this ICO contract
     constructor() {
         creator = msg.sender;
         token = new SpaceCoin();
@@ -42,7 +40,6 @@ contract ICO {
 
     event Contribute(address indexed contributor, uint amount);
     event Mint(address indexed reciever, uint tokenAmount);
-    event Whitelist(address indexed person);
 
     modifier onlyOwner() {
         require(msg.sender == creator);
@@ -94,18 +91,18 @@ contract ICO {
         taxOn = false;
     }
 
-    // not optimal in reality bc owner will have to call this function everytime to add someone to the whitelist
-    function whitelist(address _person) public onlyOwner {
+    // do the whitelisting off chain and then pass in an array of addresses all at once
+    function whitelist(address[] calldata addresses) public onlyOwner {
         require(currentPhase() == Phases.SEED || currentPhase() == Phases.NOTSTARTED);
-        whitelisted[_person] = true;
-
-        emit Whitelist(_person);
+        for (uint i=0; i<addresses.length; i++) {
+            whitelisted[addresses[i]] = true;
+        }
     }
 
     function contribute() public payable notPaused lessThanGoalRaised {
         require(currentPhase() != Phases.NOTSTARTED, "The ICO has not started yet");
         uint tokens; // needs to be multiplied by 10**18 before transferring out
-        tokens = msg.value / 1 ether * 5;
+        tokens = msg.value * 5;
         totalRaised += msg.value;
         
         if (currentPhase() == Phases.SEED) {
@@ -144,14 +141,15 @@ contract ICO {
         require(success, "could not send tax");
     }
 
+    // TODO: tax is deducted even when tax is off. Need to fix this
     function mint(uint _tokenAmount) public {
-        require(currentPhase() == Phases.OPEN);
+        require(currentPhase() == Phases.OPEN, "not in open phase yet");
         require(tokensAvailable[msg.sender] >= _tokenAmount);
         require(token.balanceOf(address(this)) >= _tokenAmount); // require ico has enough spacecoin tokens to send
         tokensAvailable[msg.sender] -= _tokenAmount;
-
         
         if (taxOn) {
+            // TODO: rounding error here bc someone who has 1 token would round down to zero here. multiply by the 10**18 first to solve this?
             (bool success) = token.transfer(msg.sender, (_tokenAmount * 98/100) * 10**18); 
             require(success);
             sendTax(_tokenAmount);
