@@ -1,5 +1,6 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, waffle} = require("hardhat");
+const provider = waffle.provider;
 const { BigNumber } = ethers;
 
 describe("ICO contract", () => {
@@ -100,7 +101,7 @@ describe("ICO contract", () => {
         })
       })
 
-      describe("general phase", async() => {
+      describe("general phase", () => {
           beforeEach(async () => {
             // move to general phase
             await ico.nextPhase();
@@ -123,6 +124,7 @@ describe("ICO contract", () => {
           await ico.connect(accounts[1]).contribute({value: ethers.utils.parseEther("10")})
           await ico.connect(accounts[1]).mint(50);
           let userBalance = ethers.utils.formatEther(await spaceCoin.balanceOf(accounts[1].address))
+          console.log(ethers.utils.formatEther(await spaceCoin.balanceOf(treasury.address)))
           expect(userBalance).to.eq("49.0")
         })
 
@@ -133,6 +135,27 @@ describe("ICO contract", () => {
           await ico.connect(accounts[1]).mint(50);
           let userBalance = ethers.utils.formatEther(await spaceCoin.balanceOf(accounts[1].address))
           expect(userBalance).to.eq("50.0")
+        })
+
+        it("should revert if a user tries to claim more tokens than they are supposed to", async() => {
+          await ico.nextPhase(); // change it to open phase
+          await ico.connect(accounts[1]).contribute({value: ethers.utils.parseEther("10")})
+          await expect(ico.connect(accounts[1]).mint(500)).to.be.reverted;
+        })
+      })
+
+      describe("withdraw", () => {
+        it("should allow the owner to withdraw funds", async() => {
+          // move to open phase
+          await ico.nextPhase()
+          await ico.nextPhase()
+          await ico.nextPhase()
+
+          await ico.connect(accounts[1]).contribute({value: ethers.utils.parseEther("1")});
+          let ownerInitialBalance = ethers.utils.formatEther(await provider.getBalance(accounts[0].address))
+          await ico.withdraw();
+          let ownerBalance = ethers.utils.formatEther(await provider.getBalance(accounts[0].address))
+          expect(ownerInitialBalance).to.not.eq(ownerBalance)
         })
       })
     })

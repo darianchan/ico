@@ -7,7 +7,7 @@ import "./Treasury.sol";
 import "hardhat/console.sol";
 
 contract ICO {
-    address public creator;
+    address public owner;
     bool public taxOn; // defaults to being turned on
     uint constant public goal = 30000 * 1 ether;
     uint public seedRaised;
@@ -32,7 +32,7 @@ contract ICO {
 
     // have all 500,000 total supply minted to this ICO contract
     constructor() {
-        creator = msg.sender;
+        owner = msg.sender;
         token = new SpaceCoin();
         treasury = new Treasury();
         taxOn = true;
@@ -42,7 +42,7 @@ contract ICO {
     event Mint(address indexed reciever, uint tokenAmount);
 
     modifier onlyOwner() {
-        require(msg.sender == creator);
+        require(msg.sender == owner);
         _;
     }
 
@@ -136,21 +136,20 @@ contract ICO {
 
     function sendTax(uint _tokenAmount) private {
         require(taxOn);
-        uint taxAmount =  (_tokenAmount * 2) / 100; // error in rouding down division
+        uint taxAmount =  (_tokenAmount * 2) / 100;
         (bool success) = token.transfer(address(treasury), taxAmount * 10**18);
         require(success, "could not send tax");
     }
 
-    // TODO: tax is deducted even when tax is off. Need to fix this
+    
     function mint(uint _tokenAmount) public {
         require(currentPhase() == Phases.OPEN, "not in open phase yet");
-        require(tokensAvailable[msg.sender] >= _tokenAmount);
-        require(token.balanceOf(address(this)) >= _tokenAmount); // require ico has enough spacecoin tokens to send
+        require(tokensAvailable[msg.sender] >= _tokenAmount * 10 ** 18, "you don't own this amount of tokens");
+        require(token.balanceOf(address(this)) >= _tokenAmount * 10 ** 18, "not enough tokens to send out");
         tokensAvailable[msg.sender] -= _tokenAmount;
         
         if (taxOn) {
-            // TODO: rounding error here bc someone who has 1 token would round down to zero here. multiply by the 10**18 first to solve this?
-            (bool success) = token.transfer(msg.sender, (_tokenAmount * 98/100) * 10**18); 
+            (bool success) = token.transfer(msg.sender, _tokenAmount * 10**18 * 98/100); 
             require(success);
             sendTax(_tokenAmount);
         } else {
@@ -161,9 +160,8 @@ contract ICO {
         emit Mint(msg.sender, _tokenAmount);
     }
 
-    // make it require that the goal is raised to withdraw?
     function withdraw() public onlyOwner {
-        (bool success, ) = creator.call{value: totalRaised}("");
+        (bool success, ) = owner.call{value: totalRaised}("");
         require(success);
     }
 }
